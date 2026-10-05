@@ -37,6 +37,9 @@ export const App = function() {
   this.parser = new AnsiParser(this.buf);
   this.easyReading = new EasyReading(this, this.view, this.buf);
 
+  // Set global charset for React components
+  window._pttchromeCharset = this.view.charset;
+
   //new pref - start
   this.antiIdleTime = 0;
   this.idleTime = 0;

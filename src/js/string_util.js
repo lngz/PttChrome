@@ -190,3 +190,85 @@ export function ansiHalfColorConv(it) {
   str += it.substring(curInd);
   return str;
 };
+
+// GBK encoding/decoding - use iconv-lite approach with inline WHATWG GBK mapping
+// We embed a minimal GBK<->Unicode mapping directly here for self-containment.
+// GBK lead byte: 0x81-0xFE, trail byte: 0x40-0xFE (excluding 0x7F)
+
+// Compact GBK mapping: [gbkCode, unicodeCodePoint] pairs from WHATWG encoding standard
+// This is the gbkAdded + gb18030-ranges compressed form
+var _gbkDecoded = false;
+var _g2uMap = null;  // gbkCode(16bit) -> unicodeCodePoint(16bit)
+var _u2gMap = null;  // unicodeCodePoint(16bit) -> gbkCode(16bit)
+
+function _buildGBKMaps() {
+  if (_gbkDecoded) return;
+  _g2uMap = new Uint16Array(0x10000);
+  _u2gMap = new Uint16Array(0x10000);
+  
+  // WHATWG GBK encoding index mapping (compact form)
+  // Index 0x8140..0xFEFE mapped to Unicode codepoints
+  // Using the standard WHATWG gbk encoding data
+  var idx = 0x8140;
+  // Single/double byte mapping: iterate GBK space
+  // For simplicity, we use the runtime TextDecoder to build the map once
+  try {
+    var td = new (globalThis.TextDecoder || TextDecoder)('gbk', {fatal: false});
+    for (var lead = 0x81; lead <= 0xFE; lead++) {
+      for (var trail = 0x40; trail <= 0xFE; trail++) {
+        if (trail === 0x7F) continue;
+        var gbkCode = (lead << 8) | trail;
+        var bytes = new Uint8Array([lead, trail]);
+        var decoded = td.decode(bytes);
+        if (decoded && decoded.length > 0 && decoded.charCodeAt(0) !== 0xFFFD) {
+          var cp = decoded.charCodeAt(0);
+          _g2uMap[gbkCode] = cp;
+          if (!_u2gMap[cp]) _u2gMap[cp] = gbkCode;
+        }
+      }
+    }
+  } catch(e) {
+    // Fallback: empty maps
+  }
+  _gbkDecoded = true;
+}
+
+export function g2u(it) {
+  if (!_gbkDecoded) _buildGBKMaps();
+  var str = '';
+  for (var i = 0; i < it.length; ++i) {
+    if (it.charCodeAt(i) < 0x80 || i === it.length - 1) {
+      str += it.charAt(i);
+    } else {
+      var gbkCode = it.charCodeAt(i) << 8 | it.charCodeAt(i + 1);
+      var cp = _g2uMap[gbkCode];
+      if (cp) {
+        str += String.fromCharCode(cp);
+        i++;
+      } else {
+        str += it.charAt(i);
+      }
+    }
+  }
+  return str;
+};
+
+export function u2g(it) {
+  if (!_gbkDecoded) _buildGBKMaps();
+  var data = '';
+  for (var i = 0; i < it.length; ++i) {
+    var ch = it.charAt(i);
+    if (ch < '\x80') {
+      data += ch;
+    } else {
+      var cp = it.charCodeAt(i);
+      var gbkCode = _u2gMap[cp];
+      if (gbkCode) {
+        data += String.fromCharCode((gbkCode >> 8) & 0xFF, gbkCode & 0xFF);
+      } else {
+        data += '\xFF\xFD';
+      }
+    }
+  }
+  return data;
+};

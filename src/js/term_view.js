@@ -17,7 +17,7 @@ export function TermView() {
   this.bbsHeight = 0;
   this.dbcsDetect = true;
   this.highlightBG = 2;
-  this.charset = 'big5';
+  this.charset = 'gbk';
   this.middleButtonFunction = 0;
   this.leftButtonFunction = false;
   this.mouseWheelFunction1 = 1;

@@ -1,5 +1,5 @@
 import WordSegmentBuilder from "./WordSegmentBuilder";
-import { b2u, isDBCSLead } from "../../js/string_util";
+import { b2u, g2u, isDBCSLead } from "../../js/string_util";
 import { symbolTable } from "../../js/symbol_table";
 
 function isBadDBCS(u) {
@@ -11,11 +11,23 @@ function shouldForceWidth(u) {
   return code == 1 || code == 2;
 }
 
+// Convert DBCS bytes to Unicode based on charset
+// Uses global charset from window if available, defaults to gbk
+function dbcsToUnicode(bytes, charset) {
+  if (charset === "gbk") return g2u(bytes);
+  return b2u(bytes); // default big5
+}
+
 export class ColorSegmentBuilder {
-  constructor(forceWidth) {
+  constructor(forceWidth, charset) {
     this.segs = [];
     this.wordBuilder = WordSegmentBuilder.NullObject;
     this.forceWidth = forceWidth;
+    // Use provided charset, or global window._pttchromeCharset set by the app, or default to gbk
+    this.charset =
+      charset ||
+      (typeof window !== "undefined" && window._pttchromeCharset) ||
+      "gbk";
     this.lead = null;
   }
 
@@ -43,7 +55,7 @@ export class ColorSegmentBuilder {
     const { lead } = this;
     const leadColor = lead.getColor();
     this.lead = null;
-    const text = b2u(lead.ch + ch.ch);
+    const text = dbcsToUnicode(lead.ch + ch.ch, this.charset);
     if (text.length !== 1) {
       // Conversion error.
       this.appendNormalChar("?", leadColor);

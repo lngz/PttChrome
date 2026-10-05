@@ -2,7 +2,13 @@
 
 import { Event } from './event';
 import { ColorState } from './term_ui';
-import { u2b, b2u, parseStatusRow, parseListRow } from './string_util';
+import { u2b, b2u, g2u, parseStatusRow, parseListRow } from './string_util';
+
+// Helper: convert DBCS bytes to Unicode based on charset
+function dbcsConv(data, charset) {
+  if (charset === 'gbk') return g2u(data);
+  return b2u(data); // default big5
+}
 
 const termColors = [
   // dark
@@ -856,7 +862,7 @@ TermBuf.prototype = {
           output += text[col].ch + this.ansiCmp(text[col], text[col+1]);
       }
       output += text[colEnd-1].ch + this.ansiCmp(text[colEnd-1], TermChar.newChar);
-      return (isutf8 && charset != 'UTF-8' ? b2u(output) : output);
+      return (isutf8 && charset != 'UTF-8' ? dbcsConv(output, charset) : output);
     }
 
     text = text.slice(colStart, colEnd);
@@ -868,7 +874,7 @@ TermBuf.prototype = {
           if ((this.view && this.view.charset == 'UTF-8') || b5.length == 1)
             return b5;
           else
-            return b2u(b5);
+            return dbcsConv(b5, this.view.charset);
         } else
           return c.ch;
       }
@@ -904,7 +910,7 @@ TermBuf.prototype = {
           if ((that.view && that.view.charset == 'UTF-8') || b5.length == 1)
             return b5;
           else
-            return b2u(b5);
+            return dbcsConv(b5, that.view.charset);
         } else
           return c.ch;
       }
